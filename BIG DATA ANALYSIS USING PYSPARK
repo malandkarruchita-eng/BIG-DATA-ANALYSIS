@@ -1,0 +1,111 @@
+#Setup PySpark
+from pyspark.sql import SparkSession
+
+# Create Spark Session
+spark = SparkSession.builder \
+    .appName("Big Data Analysis") \
+    .getOrCreate()
+spark
+#=====
+# BIG DATA ANALYSIS USING PYSPARK
+#=====
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, avg, sum, count, lag
+from pyspark.sql.window import Window
+
+# STEP 1: Create Spark Session
+
+spark = SparkSession.builder \
+    .appName("Electronic Card Transactions Analysis") \
+    .getOrCreate()
+
+# STEP 2: Load Dataset
+df = spark.read.csv(
+    "/content/electronic-card-transactions-february-2026-csv-tables.csv",
+    sep=",", # Changed separator from '|' to ','
+    header=True,
+    inferSchema=True
+)
+
+print("Initial Data:")
+df.show(5)
+df.printSchema()
+
+# STEP 3: Data Cleaning
+from pyspark.sql.functions import col
+
+df_clean = df.filter(
+    (col("Data_value").isNotNull()) &
+    ( (col("Suppressed") != "Y") | col("Suppressed").isNull() )
+)
+
+# STEP 4: Basic Analysis
+# Total records
+print("Total Records:", df_clean.count())
+
+# Records per Subject
+print("Records per Subject:")
+df_clean.groupBy("Subject") \
+    .count() \
+    .orderBy("count", ascending=False) \
+    .show()
+
+# STEP 5: Aggregation Analysis
+# Total value per Subject
+print("Total Value per Subject:")
+df_clean.groupBy("Subject") \
+    .agg(sum("Data_value").alias("Total_Value")) \
+    .orderBy("Total_Value", ascending=False) \
+    .show()
+
+# Average value per Group
+print("Average Value per Group:")
+df_clean.groupBy("Group") \
+    .agg(avg("Data_value").alias("Avg_Value")) \
+    .orderBy("Avg_Value", ascending=False) \
+    .show()
+
+# STEP 6: Time Series Analysis
+# Trend over time
+print("Trend Over Time:")
+df_clean.groupBy("Period") \
+    .agg(avg("Data_value").alias("Avg_Value")) \
+    .orderBy("Period") \
+    .show()
+
+# Growth calculation
+windowSpec = Window.orderBy("Period")
+
+df_growth = df_clean.withColumn(
+    "Previous_Value",
+    lag("Data_value").over(windowSpec)
+).withColumn(
+    "Growth",
+    col("Data_value") - col("Previous_Value")
+)
+
+print("Growth Analysis:")
+df_growth.select("Period", "Data_value", "Growth").show()
+
+# STEP 7: Top Insights
+# Top categories
+print("Top Categories:")
+df_clean.groupBy("Series_title_1") \
+    .agg(sum("Data_value").alias("Total")) \
+    .orderBy("Total", ascending=False) \
+    .show(10)
+
+# Highest values
+print("Top 10 Highest Transactions:")
+df_clean.orderBy(col("Data_value").desc()).show(10)
+
+# STEP 8: Scalability Demonstration
+print("Partitions before:", df_clean.rdd.getNumPartitions())
+
+df_repart = df_clean.repartition(8)
+
+print("Partitions after:", df_repart.rdd.getNumPartitions())
+# STEP 9: Save Output
+df_clean.write.mode("overwrite").csv("output_clean_data", header=True)
+
+print("Processing Completed Successfully!")
