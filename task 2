@@ -1,0 +1,85 @@
+#task 2
+# ==============================
+# 1. Import Libraries
+# ==============================
+import pandas as pd
+import numpy as np
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+# ==============================
+# 2. Load Dataset
+# ==============================
+# Example: Titanic dataset (you can replace with your own dataset)
+url = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+data = pd.read_csv(url)
+
+print(data.head())
+print(data.info())
+
+# ==============================
+# 3. Data Preprocessing
+# ==============================
+
+# Drop irrelevant columns
+data = data.drop(columns=["PassengerId", "Name", "Ticket", "Cabin"])
+
+# Handle missing values
+data["Age"].fillna(data["Age"].median(), inplace=True)
+data["Embarked"].fillna(data["Embarked"].mode()[0], inplace=True)
+
+# Encode categorical variables
+label_encoders = {}
+for col in ["Sex", "Embarked"]:
+    le = LabelEncoder()
+    data[col] = le.fit_transform(data[col])
+    label_encoders[col] = le
+
+# Features and target
+X = data.drop("Survived", axis=1)
+y = data["Survived"]
+
+# ==============================
+# 4. Feature Selection
+# ==============================
+selector = SelectKBest(score_func=chi2, k=5)
+X_selected = selector.fit_transform(X, y)
+
+selected_features = X.columns[selector.get_support()]
+print("Selected Features:", selected_features)
+
+# ==============================
+# 5. Train-Test Split
+# ==============================
+X_train, X_test, y_train, y_test = train_test_split(
+    X_selected, y, test_size=0.2, random_state=42
+)
+
+# ==============================
+# 6. Feature Scaling
+# ==============================
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# ==============================
+# 7. Model Training
+# ==============================
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+# ==============================
+# 8. Predictions
+# ==============================
+y_pred = model.predict(X_test)
+
+# ==============================
+# 9. Evaluation
+# ==============================
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
