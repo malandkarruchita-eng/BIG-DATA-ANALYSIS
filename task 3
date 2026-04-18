@@ -1,0 +1,105 @@
+#pip install dash pandas plotly
+# ==============================
+# 1. Import Libraries
+# ==============================
+import pandas as pd
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+import plotly.express as px
+
+# ==============================
+# 2. Load Dataset
+# ==============================
+url = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+df = pd.read_csv(url)
+
+# Data cleaning
+df["Age"].fillna(df["Age"].median(), inplace=True)
+df["Embarked"].fillna(df["Embarked"].mode()[0], inplace=True)
+
+# ==============================
+# 3. Initialize App
+# ==============================
+app = dash.Dash(__name__)
+
+# ==============================
+# 4. Layout
+# ==============================
+app.layout = html.Div([
+
+    html.H1("Titanic Dashboard", style={'textAlign': 'center'}),
+
+    # Dropdown filter
+    html.Label("Select Gender:"),
+    dcc.Dropdown(
+        id='gender_filter',
+        options=[
+            {'label': 'All', 'value': 'all'},
+            {'label': 'Male', 'value': 'male'},
+            {'label': 'Female', 'value': 'female'}
+        ],
+        value='all'
+    ),
+
+    # Age slider
+    html.Label("Select Age Range:"),
+    dcc.RangeSlider(
+        id='age_slider',
+        min=int(df['Age'].min()),
+        max=int(df['Age'].max()),
+        step=1,
+        value=[0, 80],
+        marks={i: str(i) for i in range(0, 81, 10)}
+    ),
+
+    # Graphs
+    dcc.Graph(id='survival_bar'),
+    dcc.Graph(id='class_pie')
+])
+
+# ==============================
+# 5. Callbacks (Interactivity)
+# ==============================
+
+@app.callback(
+    [Output('survival_bar', 'figure'),
+     Output('class_pie', 'figure')],
+    [Input('gender_filter', 'value'),
+     Input('age_slider', 'value')]
+)
+def update_dashboard(gender, age_range):
+
+    filtered_df = df[
+        (df['Age'] >= age_range[0]) & (df['Age'] <= age_range[1])
+    ]
+
+    if gender != 'all':
+        filtered_df = filtered_df[filtered_df['Sex'] == gender]
+
+    # Survival count
+    survival_fig = px.histogram(
+        filtered_df,
+        x='Survived',
+        color='Sex',
+        barmode='group',
+        title="Survival Count"
+    )
+
+    # Class distribution
+    class_fig = px.pie(
+        filtered_df,
+        names='Pclass',
+        title="Passenger Class Distribution"
+    )
+
+    return survival_fig, class_fig
+
+# ==============================
+# 6. Run App
+# ==============================
+if __name__ == '__main__':
+    app.run(debug=True)
+
+#run : python app.py
+#http://127.0.0.1:8050/
